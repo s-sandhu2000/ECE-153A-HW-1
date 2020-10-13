@@ -1,34 +1,89 @@
-#ifndef _CACHE_MODEL_H
-#define _CACHE_MODEL_H
+#include <stdio.h>
+#include <stdlib.h>
+#include "cache_model.h"
 
-#define CM_LINE_SIZE 8
-#define CM_CACHE_LINES 256 
-#define CM_ADDRESS_SPACE_SIZE 65536
-#define CM_DRAM_LATENCY 7
-#define CM_DRAM_CYCLES_PER_WORD 1
-#define CM_CACHE_UPDATE_CYCLES 2
-#define CM_DRAM_BUFFER_SIZE 4
+#define CACHE_SIZE (CM_CACHE_LINES*CM_LINE_SIZE)
+
+static int cache_tags[CM_CACHE_LINES];
+static int cache_enabled;
+static int dram_buffer_tag;
+static void do_uncached_access(int address);
+static void do_cached_access(int address);
+static int access_cycles;
+
+void cm_init()
+{
+	cm_reset_model();
+}
+
+void cm_reset_model()
+{
+	int i;
+	for(i=0; i<CM_CACHE_LINES; i++)
+		cache_tags[i] = -1;
+	dram_buffer_tag = -1;
+}
 
 
-// Its neater if you keep the model and your code in two seperate files
-// Compile your program with something like
-//  gcc main.c cache_model.c -lm
-//
-// Usage: call cm_init() at the start of your program.
-//
-// At the start of each simulation run call either cm_enable_cache() or
-// cm_disable_cache() to set-up, each of these automatically call
-// cm_reset_model() to clear old state.
-//
-// Per simulated access, call cm_do_access() with the address you randomly 
-// generated, then call cm_get_last_access_cycles() to query the simulated
-// time that took.
+void cm_do_access(int address)
+{
+	if((address <0)|| (address >= CM_ADDRESS_SPACE_SIZE))
+	{
+		fprintf(stderr, "cm_do_access(%d): Address out of range!\n", address);
+		exit(1);
+	}
+	if(cache_enabled)
+		do_cached_access(address);
+	else
+		do_uncached_access(address);
 
-extern void cm_init();
-extern void cm_do_access(int address);
-extern void cm_reset_model();
-extern void cm_enable_cache();
-extern void cm_disable_cache();
-extern int cm_get_last_access_cycles();
+}
 
-#endif 
+void cm_enable_cache()
+{
+	cm_reset_model();
+	cache_enabled = 1;
+}
+
+void cm_disable_cache()
+{
+	cm_reset_model();
+	cache_enabled = 0;
+}
+
+static void do_cached_access(int address)
+{
+	int line = (address/CM_LINE_SIZE) % CM_CACHE_LINES;
+	int tag = address / CM_LINE_SIZE;
+
+	if(cache_tags[line] == tag)
+	{	//Hit
+		access_cycles = 1;
+	}
+	else
+	{	//Miss
+		access_cycles = CM_DRAM_LATENCY + CM_CACHE_UPDATE_CYCLES
+			+ CM_DRAM_CYCLES_PER_WORD * CM_LINE_SIZE;
+		cache_tags[line] = tag;
+	}
+}
+
+static void do_uncached_access(int address)
+{
+	int tag = address/CM_DRAM_BUFFER_SIZE;
+	if (tag == dram_buffer_tag)
+	{	//Hit
+		access_cycles =1;
+	}
+	else
+	{
+		access_cycles = CM_DRAM_LATENCY
+			+ CM_DRAM_CYCLES_PER_WORD * CM_DRAM_BUFFER_SIZE;
+		dram_buffer_tag = tag;
+	}
+}
+
+int cm_get_last_access_cycles()
+{
+	return access_cycles;
+}
