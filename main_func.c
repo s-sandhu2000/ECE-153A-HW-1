@@ -14,10 +14,11 @@
           int testing;
           srand(time(0));
 	  cm_disable_cache();  // commented out when performing experiments with cache enabled
-	  //cm_enable_cache(); // commented out when perofrming experiments with cache disabled
+	 // cm_enable_cache(); // commented out when perofrming experiments with cache disabled
 	  int i;
 	  int total=0;
-	  int address = 0;
+	  int address = printRandoms(0,65535);
+	  int address_temp = 0;
 	  int count_11 = 0;
 	  int count_1 = 0;
 	  int count_17 = 0;
@@ -31,13 +32,18 @@
 		}
 		else if ((rand > 61) && (rand <=95)) // Simulate Probability that the next address is not sequential but is within forty words of the current one. 
 		{
-			address = printRandoms(address,address+80);
+			address_temp = printRandoms(address-40,address+40);
+			while(address_temp < 0)
+			{
+				address_temp = printRandoms(address-40,address+40);
+			}
+			address=address_temp;
 		}
 		else //Simulates probability that we obtain a random far address
 		{
 			address = printRandoms(0,65535); // Upper bound of address since we are dealing with sixteen bits.
 		}
-		address = printRandoms(lower,upper); // This line of code is for part a, when we are dealing with reading random addresses. Commented out for part b
+	//	address = printRandoms(lower,upper); // This line of code is for part a, when we are dealing with reading random addresses. Commented out for part b
 		cm_do_access(address);
 		int access = cm_get_last_access_cycles();
 		printf("%d",access);
